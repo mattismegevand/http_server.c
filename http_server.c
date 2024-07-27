@@ -17,9 +17,15 @@
 #define MAX_THREADS 16
 #define MAX_ENCODINGS 16
 
+typedef enum {
+    METHOD_GET,
+    METHOD_POST,
+    METHOD_UNKNOWN
+} http_method_t;
+
 typedef struct {
     char req[REQ_SIZE];
-    char method[STR_SIZE];
+    http_method_t method;
     char target[STR_SIZE];
     char http_version[STR_SIZE];
     char host[STR_SIZE];
@@ -104,7 +110,7 @@ int files_route(req_t *req, resp_t *resp) {
         char *filepath;
         start += strlen("/files/");
         asprintf(&filepath, "%s%s", directory, start);
-        if (strcmp(req->method, "GET") == 0) {
+        if (req->method == METHOD_GET) {
             if ((req->fp = fopen(filepath, "r")) == NULL) {
                 resp->status_code = 404;
                 strcpy(resp->opt_response, "Not Found");
@@ -212,6 +218,12 @@ resp_t make_resp(req_t *req) {
     return resp;
 }
 
+http_method_t parse_method(const char *method_str) {
+    if (strcasecmp(method_str, "GET") == 0) return METHOD_GET;
+    if (strcasecmp(method_str, "POST") == 0) return METHOD_POST;
+    return METHOD_UNKNOWN;
+}
+
 void parse_req(req_t *req) {
     char *part, *part_saveptr, *token_saveptr;
     part = strtok_r(req->req, "\r\n", &part_saveptr);
@@ -228,7 +240,7 @@ void parse_req(req_t *req) {
             if (i == 0) {
                 switch (j) {
                 case 0:
-                    strncpy(req->method, token, STR_SIZE);
+                    req->method = parse_method(token);
                     break;
                 case 1:
                     strncpy(req->target, token, STR_SIZE);
