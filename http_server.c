@@ -49,6 +49,13 @@ typedef struct {
     char body[BODY_SIZE];
 } resp_t;
 
+typedef int (*route_handler_t)(req_t *req, resp_t *resp);
+
+typedef struct {
+    const char *path;
+    route_handler_t handler;
+} route_t;
+
 char directory[4096] = {'\0'};
 
 int gzip(const char *input, int inputSize, char *output, int outputSize) {
@@ -151,12 +158,26 @@ int files_route(req_t *req, resp_t *resp) {
     return 0;
 }
 
+route_t routes[] = {
+    {"/", home_route},
+    {"/echo/", echo_route},
+    {"/user-agent", useragent_route},
+    {"/files/", files_route},
+    {NULL, NULL},
+};
+
 resp_t handle_req(req_t *req) {
     resp_t resp = {.http_version = "HTTP/1.1", .status_code = -1, .content_length = -1};
-    if (!(home_route(req, &resp) || echo_route(req, &resp) || useragent_route(req, &resp) || files_route(req, &resp))) {
-        resp.status_code = 404;
-        strcpy(resp.opt_response, "Not Found");
+
+    for (route_t *route = routes; route->path != NULL; route++) {
+        if (strncmp(req->target, route->path, strlen(route->path)) == 0) {
+            if (route->handler(req, &resp)) {
+                return resp;
+            }
+        }
     }
+    resp.status_code = 404;
+    strcpy(resp.opt_response, "Not Found");
     return resp;
 }
 
